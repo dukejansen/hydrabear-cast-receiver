@@ -6,27 +6,24 @@
 <!-- =============================================================================
   HydraBear custom Cast receiver (styled web receiver, CAF v3).
 
-  WHY: Google's Default Media Receiver hard-caps its controls (no next/prev/up-next
-  even with a queue) and botches seek-on-load (unreliable resume). Our own receiver
-  fixes both AND brands it in HydraBear's colors.
+  Custom receiver so we get real controls (next/prev/seek), reliable resume, and HB
+  branding the default receiver can't do. Data comes ONLY from the Cast queue for now
+  (no server / custom-message channel yet).
 
-  PHASE 1 (this file): HB green palette + logo, real controls (next/prev/seek), the
-  built-in player's up-next/queue for a queued book, and reliable resume.
-  PHASE 2 (later): a fully-custom Now-Playing CARD layout (our exact fonts/spacing +
-  "Chapter N of M" + a styled up-next list) rendered from the media status.
+  UI status: keeps CAF's built-in <cast-media-player> (art + working transport +
+  queue nav) and OVERLAYS our HB chrome -> a title bar (logo + name) and an "Up Next"
+  strip fed by the queue via PlayerDataBinder. Next iteration: replace the built-in
+  player UI with a fully-custom HB Now-Playing card (own layout + up-next list + chapters).
 
-  DEPLOY: host receiver.html AND icon.svg (same folder) at a PUBLIC HTTPS URL, register
-  a Custom Receiver in the Cast console (points at receiver.html), register your home
-  devices, then set cast.receiver.appid in HydraBear config. Sender sends a standard
-  QUEUE_LOAD (no proprietary customData); media URLs carry their own token.
+  DEPLOY: host receiver.html AND icon.svg (same folder) at a PUBLIC HTTPS URL; register
+  a Custom Receiver in the Cast console (points at receiver.html); register your devices;
+  set cast.receiver.appid in HydraBear config. After any change: re-upload + wait for
+  Pages redeploy + POWER-CYCLE the device (it caches the receiver aggressively).
 ============================================================================= -->
 <title>HydraBear</title>
 <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
-<!-- TEMP: on-screen debug overlay so we can see load/playback errors ON the display. Remove once casting works. -->
-<script src="https://www.gstatic.com/cast/sdk/libs/devtools/debug_layer/caf_receiver_logger.js"></script>
 <style>
-  /* HydraBear palette (from web/index.html): bg #0f1115, surfaces #171a21/#121620,
-     text #e6e6e6, GREEN accents #5a9 / #7fe08a, muted #9fb0c4. */
+  /* HydraBear palette (web/index.html): bg #0f1115, text #e6e6e6, GREEN #5a9 / #7fe08a, muted #9fb0c4. */
   html, body {
     margin: 0; height: 100%;
     background: radial-gradient(circle at 50% 38%, #16202b 0%, #0f1115 70%);
@@ -35,57 +32,89 @@
   }
   cast-media-player {
     --background-color: #0f1115;
-    --theme-hue: 150;                 /* green, matching HB's #5a9 accent */
-    --progress-color: #5aa987;        /* HB green progress fill (#5a9) */
+    --theme-hue: 150;
+    --progress-color: #5aa987;
     --title-color: #e6e6e6;
     --subtitle-color: #9fb0c4;
-    --logo-color: #7fe08a;            /* HB bright green */
+    --logo-color: #7fe08a;
     --buffering-color: #7fe08a;
-    --splash-image: url("icon.svg");  /* HB hub mark on the idle/splash screen */
-    --logo-image: url("icon.svg");    /* small HB watermark during playback */
+    --splash-image: url("icon.svg");
   }
+  /* Our own title bar (logo + name) over the player -- the built-in player has no logo slot. */
+  #hbbar {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 20;
+    display: flex; align-items: center; gap: 12px;
+    padding: 16px 26px; box-sizing: border-box;
+    font: 700 24px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: #7fe08a; letter-spacing: .02em;
+    background: linear-gradient(180deg, #0f1115 0%, rgba(15,17,21,.72) 58%, rgba(15,17,21,0) 100%);
+    pointer-events: none;
+  }
+  #hbbar img { width: 36px; height: 36px; flex: 0 0 auto; }
+  /* "Up Next" strip fed by the Cast queue (PlayerData.nextTitle/nextThumbnailUrl). Hidden when no next item. */
+  #hbnext {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    display: none; align-items: center; gap: 14px;
+    padding: 16px 26px; box-sizing: border-box;
+    background: linear-gradient(0deg, #0f1115 0%, rgba(15,17,21,.72) 58%, rgba(15,17,21,0) 100%);
+    pointer-events: none;
+  }
+  #hbnext .lbl { color: #7fe08a; font: 700 13px system-ui; letter-spacing: .14em; text-transform: uppercase; flex: 0 0 auto; }
+  #hbnext img { width: 46px; height: 46px; border-radius: 6px; object-fit: cover; background: #0b0d11; flex: 0 0 auto; }
+  #hbnext .t { font: 600 19px system-ui; color: #e6e6e6; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 </style>
 </head>
 <body>
+  <div id="hbbar"><img src="icon.svg" alt=""><span>HydraBear</span></div>
   <cast-media-player></cast-media-player>
+  <div id="hbnext">
+    <span class="lbl">Up Next</span>
+    <img id="hbnextimg" alt="">
+    <span class="t" id="hbnexttitle"></span>
+  </div>
   <script>
-    // ---- PUBLIC display name: change this (and <title> above) when the name is finalized. ----
+    // ---- PUBLIC display name: change this (and <title> + #hbbar span) when the name is finalized. ----
     const NAME = "HydraBear";
 
     const ctx = cast.framework.CastReceiverContext.getInstance();
     const pm = ctx.getPlayerManager();
     const Cmd = cast.framework.messages.Command;
 
-    // TEMP debug overlay -- prints LOAD requests + errors on the display so we can diagnose "launches but won't play".
-    try {
-      const dbg = cast.debug.CastDebugLogger.getInstance();
-      dbg.setEnabled(true);
-      dbg.showDebugLogs(true);
-      pm.addEventListener(cast.framework.events.EventType.ERROR, (e) => {
-        try { dbg.info("HB", "PLAYER ERROR: " + JSON.stringify(e)); } catch (x) {}
-      });
-    } catch (e) {}
-
-    // Rich on-screen controls (next/prev/seek) -- the whole reason for a custom receiver.
+    // Rich on-screen controls (next/prev/seek).
     pm.setSupportedMediaCommands(
       Cmd.ALL_BASIC_MEDIA | Cmd.QUEUE_NEXT | Cmd.QUEUE_PREV | Cmd.SEEK, true);
 
-    // Reliable RESUME: the default receiver mishandles a currentTime in the LOAD (esp. chaptered m4b).
-    // Take the position (customData.startPosition, else the request's currentTime) and seek AFTER the
-    // media is ready -- no fragile sender-side post-load-seek.
+    // Reliable RESUME: seek AFTER the media is ready (a currentTime in the LOAD breaks chaptered m4b).
     let resumeTo = 0;
     pm.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, (req) => {
       const cd = (req.media && req.media.customData) || {};
       resumeTo = Number(cd.startPosition || req.currentTime || 0) || 0;
-      req.currentTime = 0; // don't let the load itself seek; we do it on load-complete
+      req.currentTime = 0;
       return req;
     });
     pm.addEventListener(cast.framework.events.EventType.PLAYER_LOAD_COMPLETE, () => {
       if (resumeTo > 1) { try { pm.seek(resumeTo); } catch (e) {} resumeTo = 0; }
     });
 
-    // PHASE 2 hook: render a fully-custom HB Now-Playing card here (cover, title, author,
-    // "Chapter N of M", styled up-next) from pm.getMediaInformation() + pm.getQueueManager().
+    // "Up Next" from the QUEUE -- PlayerDataBinder surfaces the next item's title/thumbnail. Fully guarded:
+    // if the fields aren't populated the strip just stays hidden; never affects playback.
+    try {
+      const playerData = new cast.framework.ui.PlayerData();
+      const binder = new cast.framework.ui.PlayerDataBinder(playerData);
+      const nextEl = document.getElementById("hbnext");
+      binder.addEventListener(cast.framework.ui.PlayerDataEventType.ANY_CHANGE, () => {
+        try {
+          const nt = playerData.nextTitle;
+          if (nt) {
+            document.getElementById("hbnexttitle").textContent = nt;
+            document.getElementById("hbnextimg").src = playerData.nextThumbnailUrl || "icon.svg";
+            nextEl.style.display = "flex";
+          } else {
+            nextEl.style.display = "none";
+          }
+        } catch (e) {}
+      });
+    } catch (e) {}
 
     ctx.start(new cast.framework.CastReceiverOptions());
   </script>
