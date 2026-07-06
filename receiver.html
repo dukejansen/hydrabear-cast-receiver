@@ -51,6 +51,8 @@
     pointer-events: none;
   }
   #hbbar img { width: 36px; height: 36px; flex: 0 0 auto; }
+  /* DEV version badge -- confirms which receiver build actually loaded (bump on every deploy). */
+  #hbver { position: fixed; top: 8px; right: 12px; z-index: 30; font: 600 12px system-ui; color: #5aa987; opacity: .75; pointer-events: none; }
   /* "Up Next" strip fed by the Cast queue (PlayerData.nextTitle/nextThumbnailUrl). Hidden when no next item. */
   #hbnext {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
@@ -66,6 +68,7 @@
 </head>
 <body>
   <div id="hbbar"><img src="icon.svg" alt=""><span>HydraBear</span></div>
+  <div id="hbver">v3 · up-next</div>
   <cast-media-player></cast-media-player>
   <div id="hbnext">
     <span class="lbl">Up Next</span>
