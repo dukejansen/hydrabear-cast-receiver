@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- =============================================================================
+  HydraBear custom Cast receiver -- DEV / App B (fully-custom Now-Playing card).
+
+  Learned the hard way: the built-in <cast-media-player> UI takes over the whole
+  screen during playback and buries any overlay. So here we DEMOTE it to a hidden
+  audio engine (covered by our own opaque full-screen card) and render 100% our own
+  DOM -- cover, title, author, chapter, progress, our own transport, and an Up-Next
+  list -- driven by PlayerDataBinder (display) + PlayerManager (control).
+
+  Data is queue-only for now (no server / custom-message channel). This is the
+  experimental receiver; the stable simple-branded one is receiver.html (App A).
+
+  DEPLOY: upload receiver-dev.html + icon.svg; register a 2nd Custom Receiver (App B)
+  at this file's URL; point HB's dev appid at App B. Re-upload + Pages build (green
+  check) + power-cycle the device to pick up changes. Version badge (top-right) confirms.
+============================================================================= -->
+<title>HydraBear</title>
+<script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+<style>
+  html, body { margin: 0; height: 100%; background: #0f1115; color: #e6e6e6;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; overflow: hidden; }
+  /* The built-in player still plays the audio, but we cover it completely with #card. */
+  cast-media-player { position: fixed; inset: 0; z-index: 0; }
+
+  #card {
+    position: fixed; inset: 0; z-index: 2147483000;
+    background: radial-gradient(circle at 50% 30%, #16202b 0%, #0f1115 72%);
+    display: flex; flex-direction: column; box-sizing: border-box; padding: 0 6vw;
+  }
+  /* Title bar */
+  #bar { display: flex; align-items: center; gap: 12px; padding: 22px 0 6px;
+    font: 700 24px system-ui; color: #7fe08a; letter-spacing: .02em; }
+  #bar img { width: 34px; height: 34px; }
+  #bar #ver { margin-left: auto; font: 600 12px system-ui; color: #5aa987; opacity: .75; }
+
+  /* Main: cover + metadata */
+  #main { flex: 1 1 auto; display: flex; align-items: center; gap: 5vw; min-height: 0; }
+  #cover { height: 46vh; max-height: 46vh; aspect-ratio: 1/1; object-fit: cover; border-radius: 14px;
+    background: #0b0d11; box-shadow: 0 12px 40px rgba(0,0,0,.55); flex: 0 0 auto; }
+  #meta { min-width: 0; }
+  #title { font: 700 3.1vh system-ui; line-height: 1.15; margin-bottom: 1.4vh;
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  #author { font: 500 2.2vh system-ui; color: #9fb0c4; margin-bottom: 1vh; }
+  #chapter { font: 600 1.9vh system-ui; color: #7fe08a; letter-spacing: .04em; text-transform: uppercase; }
+
+  /* Progress + times */
+  #prog { height: 6px; background: #243; border-radius: 4px; overflow: hidden; margin: 1.4vh 0 .6vh; }
+  #fill { height: 100%; width: 0; background: linear-gradient(90deg, #2c8f59, #3ac); }
+  #times { display: flex; justify-content: space-between; font: 500 1.7vh system-ui; color: #9fb0c4; }
+
+  /* Controls */
+  #ctrls { display: flex; align-items: center; justify-content: center; gap: 3.2vw; padding: 2.2vh 0 1vh; }
+  #ctrls button { border: 0; background: transparent; color: #e6e6e6; cursor: pointer;
+    font: 600 2vh system-ui; display: flex; align-items: center; justify-content: center; }
+  #ctrls .ico { width: 6.4vh; height: 6.4vh; border-radius: 50%; background: #1c2330; border: 1px solid #2a3a4a;
+    font-size: 2.6vh; }
+  #ctrls #pp { width: 8.2vh; height: 8.2vh; background: #2c8f59; border-color: #3ac; font-size: 3.2vh; color: #06120b; }
+  #ctrls .seek { font: 700 1.7vh system-ui; color: #cde; }
+
+  /* Up Next */
+  #upnext { display: none; align-items: center; gap: 14px; padding: 1.6vh 0 3vh; }
+  #upnext .lbl { color: #7fe08a; font: 700 1.4vh system-ui; letter-spacing: .14em; text-transform: uppercase; }
+  #upnext img { width: 5vh; height: 5vh; border-radius: 6px; object-fit: cover; background: #0b0d11; }
+  #upnext #ntitle { font: 600 2vh system-ui; color: #e6e6e6; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+</style>
+</head>
+<body>
+  <cast-media-player></cast-media-player>
+  <div id="card">
+    <div id="bar"><img src="icon.svg" alt=""><span>HydraBear</span><span id="ver">v4-dev</span></div>
+    <div id="main">
+      <img id="cover" alt="">
+      <div id="meta">
+        <div id="title">Ready</div>
+        <div id="author"></div>
+        <div id="chapter"></div>
+      </div>
+    </div>
+    <div id="prog"><div id="fill"></div></div>
+    <div id="times"><span id="cur">0:00</span><span id="dur">0:00</span></div>
+    <div id="ctrls">
+      <button id="prev" class="ico" title="Previous">&#9198;</button>
+      <button id="back" class="ico seek" title="Back 30s">&#8630;30</button>
+      <button id="pp" title="Play/Pause">&#9208;</button>
+      <button id="fwd" class="ico seek" title="Forward 30s">30&#8631;</button>
+      <button id="next" class="ico" title="Next">&#9197;</button>
+    </div>
+    <div id="upnext"><span class="lbl">Up Next</span><img id="nimg" alt=""><span id="ntitle"></span></div>
+  </div>
+  <script>
+    const NAME = "HydraBear";
+    const ctx = cast.framework.CastReceiverContext.getInstance();
+    const pm = ctx.getPlayerManager();
+    const Cmd = cast.framework.messages.Command;
+    const $ = (id) => document.getElementById(id);
+
+    pm.setSupportedMediaCommands(
+      Cmd.ALL_BASIC_MEDIA | Cmd.QUEUE_NEXT | Cmd.QUEUE_PREV | Cmd.SEEK, true);
+
+    // Reliable resume (seek after the media is ready).
+    let resumeTo = 0;
+    pm.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, (req) => {
+      const cd = (req.media && req.media.customData) || {};
+      resumeTo = Number(cd.startPosition || req.currentTime || 0) || 0;
+      req.currentTime = 0;
+      return req;
+    });
+    pm.addEventListener(cast.framework.events.EventType.PLAYER_LOAD_COMPLETE, () => {
+      if (resumeTo > 1) { try { pm.seek(resumeTo); } catch (e) {} resumeTo = 0; }
+    });
+
+    const fmt = (s) => {
+      s = Math.max(0, Math.floor(s || 0));
+      const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+      return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(x).padStart(2, "0");
+    };
+
+    // ---- DISPLAY: bind our DOM to player data ----
+    try {
+      const pd = new cast.framework.ui.PlayerData();
+      const binder = new cast.framework.ui.PlayerDataBinder(pd);
+      binder.addEventListener(cast.framework.ui.PlayerDataEventType.ANY_CHANGE, () => {
+        try {
+          $("title").textContent = pd.title || "Ready";
+          $("author").textContent = pd.subtitle || "";
+          const img = pd.thumbnailUrl || (pd.metadata && pd.metadata.images && pd.metadata.images[0] && pd.metadata.images[0].url);
+          if (img) $("cover").src = img;
+
+          // chapter N of M from the queue
+          let idx = -1, len = 0;
+          try { const qm = pm.getQueueManager(); if (qm) { idx = qm.getCurrentItemIndex(); len = (qm.getItems() || []).length; } } catch (e) {}
+          $("chapter").textContent = (idx >= 0 && len > 0) ? ("Part " + (idx + 1) + " of " + len) : "";
+
+          // progress + times
+          const cur = pd.currentTime || 0, dur = pd.duration || 0;
+          $("cur").textContent = fmt(cur);
+          $("dur").textContent = fmt(dur);
+          $("fill").style.width = dur > 0 ? Math.min(100, (cur / dur) * 100) + "%" : "0";
+
+          // play/pause icon (paused shows play triangle)
+          const paused = pd.state === cast.framework.ui.State.PAUSED;
+          $("pp").innerHTML = paused ? "&#9205;" : "&#9208;";
+
+          // up next
+          const nt = pd.nextTitle;
+          if (nt) { $("ntitle").textContent = nt; $("nimg").src = pd.nextThumbnailUrl || "icon.svg"; $("upnext").style.display = "flex"; }
+          else { $("upnext").style.display = "none"; }
+        } catch (e) {}
+      });
+    } catch (e) {}
+
+    // ---- CONTROLS ----
+    const curTime = () => { try { return pm.getCurrentTimeSec(); } catch (e) { return 0; } };
+    $("pp").onclick = () => { try { (pm.getPlayerState && pm.getPlayerState() === cast.framework.messages.PlayerState.PAUSED) ? pm.play() : pm.pause(); } catch (e) {} };
+    $("back").onclick = () => { try { pm.seek(Math.max(0, curTime() - 30)); } catch (e) {} };
+    $("fwd").onclick = () => { try { pm.seek(curTime() + 30); } catch (e) {} };
+    // Queue prev/next -- best-effort (this is the iteration-risk bit on a custom receiver).
+    const jump = (n) => { try { pm.sendLocalMediaRequest(new cast.framework.messages.QueueUpdateRequestData({ jump: n })); } catch (e) { try { pm.broadcastStatus(true); } catch (x) {} } };
+    $("prev").onclick = () => jump(-1);
+    $("next").onclick = () => jump(1);
+
+    ctx.start(new cast.framework.CastReceiverOptions());
+  </script>
+</body>
+</html>
