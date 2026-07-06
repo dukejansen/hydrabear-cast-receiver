@@ -22,6 +22,8 @@
 ============================================================================= -->
 <title>HydraBear</title>
 <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
+<!-- TEMP: on-screen debug overlay so we can see load/playback errors ON the display. Remove once casting works. -->
+<script src="https://www.gstatic.com/cast/sdk/libs/devtools/debug_layer/caf_receiver_logger.js"></script>
 <style>
   /* HydraBear palette (from web/index.html): bg #0f1115, surfaces #171a21/#121620,
      text #e6e6e6, GREEN accents #5a9 / #7fe08a, muted #9fb0c4. */
@@ -53,6 +55,16 @@
     const ctx = cast.framework.CastReceiverContext.getInstance();
     const pm = ctx.getPlayerManager();
     const Cmd = cast.framework.messages.Command;
+
+    // TEMP debug overlay -- prints LOAD requests + errors on the display so we can diagnose "launches but won't play".
+    try {
+      const dbg = cast.debug.CastDebugLogger.getInstance();
+      dbg.setEnabled(true);
+      dbg.showDebugLogs(true);
+      pm.addEventListener(cast.framework.events.EventType.ERROR, (e) => {
+        try { dbg.info("HB", "PLAYER ERROR: " + JSON.stringify(e)); } catch (x) {}
+      });
+    } catch (e) {}
 
     // Rich on-screen controls (next/prev/seek) -- the whole reason for a custom receiver.
     pm.setSupportedMediaCommands(
