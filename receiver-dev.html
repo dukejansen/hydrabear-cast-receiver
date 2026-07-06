@@ -29,19 +29,19 @@
 
   /* Top bar: brand left, Up Next right */
   #bar { display: flex; align-items: center; justify-content: space-between; gap: 3vw; padding: 3vh 0 1vh; }
-  #brand { display: flex; align-items: center; gap: 14px; font: 800 4vh system-ui; color: #7fe08a; }
-  #brand img { width: 5.2vh; height: 5.2vh; }
-  #upnext { display: none; align-items: center; gap: 16px; max-width: 46vw; }
+  #brand { display: flex; align-items: center; gap: 16px; font: 800 4.7vh system-ui; color: #7fe08a; }
+  #brand img { width: 6vh; height: 6vh; }
+  #upnext { display: none; align-items: center; gap: 18px; max-width: 46vw; }
   #upnext .un-txt { text-align: right; min-width: 0; }
-  #upnext .un-lbl { color: #7fe08a; font: 800 1.8vh system-ui; letter-spacing: .16em; text-transform: uppercase; }
-  #upnext #ntitle { font: 600 2.5vh system-ui; color: #cfe; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-  #upnext img { width: 6.6vh; height: 6.6vh; border-radius: 8px; object-fit: cover; background: #0b0d11; flex: 0 0 auto; }
+  #upnext .un-lbl { color: #7fe08a; font: 800 2.1vh system-ui; letter-spacing: .16em; text-transform: uppercase; }
+  #upnext #ntitle { font: 600 3vh system-ui; color: #cfe; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #upnext img { width: 7.6vh; height: 7.6vh; border-radius: 8px; object-fit: cover; background: #0b0d11; flex: 0 0 auto; }
 
-  #main { flex: 1 1 auto; display: flex; align-items: center; gap: 4vw; min-height: 0; }
-  #cover { height: 54vh; aspect-ratio: 1/1; object-fit: cover; border-radius: 16px;
+  #main { flex: 1 1 auto; display: flex; align-items: center; gap: 5vw; min-height: 0; }
+  #cover { height: 62vh; aspect-ratio: 2/3; object-fit: cover; border-radius: 14px;
     background: #0b0d11; box-shadow: 0 14px 44px rgba(0,0,0,.6); flex: 0 0 auto; }
   #meta { min-width: 0; flex: 1 1 auto; }
-  #eyebrow { font: 800 2.3vh system-ui; letter-spacing: .18em; text-transform: uppercase; color: #7fe08a; margin-bottom: 1.2vh; }
+  #eyebrow { font: 800 2.6vh system-ui; letter-spacing: .2em; text-transform: uppercase; color: #7fe08a; margin-bottom: 2.6vh; }
   #title { font: 800 6.8vh system-ui; line-height: 1.06; margin-bottom: 2vh;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   #author { font: 600 4.2vh system-ui; color: #cfe; margin-bottom: 2.4vh; min-height: 4.2vh; }
@@ -89,7 +89,7 @@
       <button id="next" title="Next"><svg viewBox="0 0 24 24"><path d="M14.8 6H17v12h-2.2zM4 6l10.5 6L4 18z"/></svg></button>
     </div>
   </div>
-  <div id="ver">v7-dev</div>
+  <div id="ver">v8-dev</div>
   <script>
     const NAME = "HydraBear";
     const ctx = cast.framework.CastReceiverContext.getInstance();
