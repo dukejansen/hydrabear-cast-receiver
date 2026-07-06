@@ -6,16 +6,15 @@
 <!-- =============================================================================
   HydraBear custom Cast receiver -- DEV / App B (fully-custom Now-Playing card).
 
-  Built-in <cast-media-player> is demoted to a hidden audio engine; we render our own
-  full-screen card over it. Data is queue-only (QueueManager + PlayerData); no server.
+  Built-in <cast-media-player> is a hidden audio engine; we render our own full-screen
+  card over it. Queue-only data (QueueManager + PlayerData); no server.
 
-  v5: real SVG control icons (no emoji/glyph fonts -- they render as tofu on the device),
-  bigger type, book title + author + "Part N of M", Up Next from the QueueManager.
-  Icons are inline SVG so they render identically on every surface (the same reason the
-  HB app should move off emoji icons). prev/next FUNCTION is best-effort (see jump()).
+  v6: Up Next moved into the TOP BAR (logo+name left, Up Next right) -- no bottom strip,
+  no rotation, no control overlay (always-visible controls, by design). Adds a NOW
+  PLAYING eyebrow + author line. SVG control icons (no emoji/glyph fonts).
 
-  DEPLOY: upload + Pages build (green check) + POWER-CYCLE the device (or bump the URL
-  with ?v=N in the console) to bust caches. Version badge (top-right) confirms the build.
+  DEPLOY: upload + Pages build (green check) + POWER-CYCLE the device to bust caches.
+  Version badge (bottom-right) confirms the build.
 ============================================================================= -->
 <title>HydraBear</title>
 <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
@@ -28,18 +27,24 @@
     background: radial-gradient(circle at 50% 32%, #16241f 0%, #0f1512 72%);
     display: flex; flex-direction: column; box-sizing: border-box; padding: 0 5vw; }
 
-  #bar { display: flex; align-items: center; gap: 14px; padding: 3vh 0 1vh;
-    font: 800 3.4vh system-ui; color: #7fe08a; letter-spacing: .01em; }
-  #bar img { width: 4.6vh; height: 4.6vh; }
-  #bar #ver { margin-left: auto; font: 600 1.5vh system-ui; color: #5aa987; opacity: .7; }
+  /* Top bar: brand left, Up Next right */
+  #bar { display: flex; align-items: center; justify-content: space-between; gap: 3vw; padding: 3vh 0 1vh; }
+  #brand { display: flex; align-items: center; gap: 14px; font: 800 3.4vh system-ui; color: #7fe08a; }
+  #brand img { width: 4.6vh; height: 4.6vh; }
+  #upnext { display: none; align-items: center; gap: 14px; max-width: 46vw; }
+  #upnext .un-txt { text-align: right; min-width: 0; }
+  #upnext .un-lbl { color: #7fe08a; font: 800 1.5vh system-ui; letter-spacing: .16em; text-transform: uppercase; }
+  #upnext #ntitle { font: 600 2.1vh system-ui; color: #cfe; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #upnext img { width: 6vh; height: 6vh; border-radius: 8px; object-fit: cover; background: #0b0d11; flex: 0 0 auto; }
 
   #main { flex: 1 1 auto; display: flex; align-items: center; gap: 4.5vw; min-height: 0; }
   #cover { height: 52vh; aspect-ratio: 1/1; object-fit: cover; border-radius: 16px;
     background: #0b0d11; box-shadow: 0 14px 44px rgba(0,0,0,.6); flex: 0 0 auto; }
   #meta { min-width: 0; flex: 1 1 auto; }
-  #title { font: 800 5.2vh system-ui; line-height: 1.08; margin-bottom: 1.8vh;
+  #eyebrow { font: 800 1.9vh system-ui; letter-spacing: .18em; text-transform: uppercase; color: #7fe08a; margin-bottom: 1vh; }
+  #title { font: 800 5.2vh system-ui; line-height: 1.08; margin-bottom: 1.6vh;
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-  #author { font: 500 3.4vh system-ui; color: #cfe; margin-bottom: 2.2vh; }
+  #author { font: 500 3.2vh system-ui; color: #cfe; margin-bottom: 2vh; min-height: 3.2vh; }
   #chapter { display: inline-block; font: 700 2.4vh system-ui; color: #0b120d; background: #7fe08a;
     padding: .5vh 1.6vh; border-radius: 999px; letter-spacing: .04em; }
 
@@ -47,7 +52,7 @@
   #fill { height: 100%; width: 0; background: linear-gradient(90deg, #2c8f59, #5fe0a0); }
   #times { display: flex; justify-content: space-between; font: 600 2.1vh system-ui; color: #9fb0c4; }
 
-  #ctrls { display: flex; align-items: center; justify-content: center; gap: 3vw; padding: 2.4vh 0 1.2vh; }
+  #ctrls { display: flex; align-items: center; justify-content: center; gap: 3vw; padding: 2.4vh 0 3.4vh; }
   #ctrls button { border: 0; cursor: pointer; color: #e6e6e6; background: #1c2330; border: 1px solid #2a3a4a;
     border-radius: 50%; width: 9vh; height: 9vh; display: flex; align-items: center; justify-content: center; }
   #ctrls button svg { width: 4.4vh; height: 4.4vh; fill: currentColor; }
@@ -55,19 +60,20 @@
   #ctrls #pp { width: 11vh; height: 11vh; background: #2c8f59; border-color: #5fe0a0; color: #06120b; }
   #ctrls #pp svg { width: 5.4vh; height: 5.4vh; }
 
-  #upnext { display: none; align-items: center; gap: 16px; padding: 1.8vh 0 3vh; }
-  #upnext .lbl { color: #7fe08a; font: 800 1.7vh system-ui; letter-spacing: .16em; text-transform: uppercase; }
-  #upnext img { width: 6vh; height: 6vh; border-radius: 8px; object-fit: cover; background: #0b0d11; }
-  #upnext #ntitle { font: 600 2.6vh system-ui; color: #e6e6e6; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #ver { position: fixed; right: 1.4vw; bottom: 1vh; z-index: 2147483001; font: 600 1.3vh system-ui; color: #5aa987; opacity: .55; }
 </style>
 </head>
 <body>
   <cast-media-player></cast-media-player>
   <div id="card">
-    <div id="bar"><img src="icon.svg" alt=""><span>HydraBear</span><span id="ver">v5-dev</span></div>
+    <div id="bar">
+      <div id="brand"><img src="icon.svg" alt=""><span>HydraBear</span></div>
+      <div id="upnext"><div class="un-txt"><div class="un-lbl">Up Next</div><div id="ntitle"></div></div><img id="nimg" alt=""></div>
+    </div>
     <div id="main">
       <img id="cover" alt="">
       <div id="meta">
+        <div id="eyebrow">Now Playing</div>
         <div id="title">Ready</div>
         <div id="author"></div>
         <div id="chapter" style="display:none"></div>
@@ -82,8 +88,8 @@
       <button id="fwd" class="seek" title="Forward 30s">+30</button>
       <button id="next" title="Next"><svg viewBox="0 0 24 24"><path d="M14.8 6H17v12h-2.2zM4 6l10.5 6L4 18z"/></svg></button>
     </div>
-    <div id="upnext"><span class="lbl">Up Next</span><img id="nimg" alt=""><span id="ntitle"></span></div>
   </div>
+  <div id="ver">v6-dev</div>
   <script>
     const NAME = "HydraBear";
     const ctx = cast.framework.CastReceiverContext.getInstance();
@@ -96,7 +102,6 @@
     pm.setSupportedMediaCommands(
       Cmd.ALL_BASIC_MEDIA | Cmd.QUEUE_NEXT | Cmd.QUEUE_PREV | Cmd.SEEK, true);
 
-    // Reliable resume (seek after media is ready).
     let resumeTo = 0;
     pm.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, (req) => {
       const cd = (req.media && req.media.customData) || {};
@@ -116,7 +121,6 @@
     const mdOf = (item) => (item && item.media && item.media.metadata) || {};
     const imgOf = (md) => (md.images && md.images[0] && md.images[0].url) || "";
 
-    // Static metadata (title / author / cover / part / up-next) from the QUEUE.
     function refreshMeta() {
       try {
         const qm = pm.getQueueManager && pm.getQueueManager();
@@ -125,7 +129,8 @@
         const idx = qm.getCurrentItemIndex();
         const cur = mdOf(items[idx]);
         $("title").textContent = cur.albumName || cur.title || "Playing";
-        $("author").textContent = cur.artist || cur.albumArtist || "";
+        const au = cur.artist || cur.albumArtist || "";
+        $("author").textContent = au;
         const cimg = imgOf(cur); if (cimg) $("cover").src = cimg;
         if (idx >= 0 && items.length > 0) { $("chapter").style.display = "inline-block"; $("chapter").textContent = "Part " + (idx + 1) + " of " + items.length; }
         const nx = items[idx + 1];
@@ -134,7 +139,6 @@
       } catch (e) {}
     }
 
-    // Live position + play/pause state from PlayerData.
     try {
       const pd = new cast.framework.ui.PlayerData();
       const binder = new cast.framework.ui.PlayerDataBinder(pd);
@@ -145,18 +149,17 @@
           $("fill").style.width = d > 0 ? Math.min(100, (c / d) * 100) + "%" : "0";
           const paused = pd.state === cast.framework.ui.State.PAUSED;
           $("pp").innerHTML = paused ? ICON_PLAY : ICON_PAUSE;
+          $("eyebrow").textContent = paused ? "Paused" : "Now Playing";
           refreshMeta();
         } catch (e) {}
       });
     } catch (e) {}
     pm.addEventListener(cast.framework.events.EventType.PLAYER_LOAD_COMPLETE, refreshMeta);
 
-    // Controls.
     const curTime = () => { try { return pm.getCurrentTimeSec(); } catch (e) { return 0; } };
     $("pp").onclick = () => { try { (pm.getPlayerState() === cast.framework.messages.PlayerState.PAUSED) ? pm.play() : pm.pause(); } catch (e) {} };
     $("back").onclick = () => { try { pm.seek(Math.max(0, curTime() - 30)); } catch (e) {} };
     $("fwd").onclick = () => { try { pm.seek(curTime() + 30); } catch (e) {} };
-    // Queue jump -- best-effort: jump to the target item by id via a QUEUE_UPDATE request.
     const jump = (n) => {
       try {
         const qm = pm.getQueueManager();
