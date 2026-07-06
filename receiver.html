@@ -7,39 +7,40 @@
   HydraBear custom Cast receiver (styled web receiver, CAF v3).
 
   WHY: Google's Default Media Receiver hard-caps its controls (no next/prev/up-next
-  even with a queue) and botches seek-on-load (unreliable resume). A custom receiver
-  we own fixes both AND lets us brand it like HB's Now Playing card.
+  even with a queue) and botches seek-on-load (unreliable resume). Our own receiver
+  fixes both AND brands it in HydraBear's colors.
 
-  DEPLOY (one-time):
-    1. Host this file at a PUBLIC HTTPS URL, e.g. https://<your-domain>/cast/receiver.html
-       (an S3 static-site bucket works -- just upload it).
-    2. Google Cast Developer Console (https://cast.google.com/publish) -> $5 one-time
-       registration -> "Add new application" -> Custom Receiver -> paste the HTTPS URL
-       -> get an Application ID.
-    3. Register your home Cast devices (serial numbers) under "Cast Receiver Devices"
-       so they can load an unpublished receiver (no Google review needed for your own devices).
-    4. Set the Application ID in HydraBear config: cast.receiver.appid=<APP_ID>
-       (when set, HB launches THIS receiver + QUEUE_LOAD; else falls back to the default receiver).
+  PHASE 1 (this file): HB green palette + logo, real controls (next/prev/seek), the
+  built-in player's up-next/queue for a queued book, and reliable resume.
+  PHASE 2 (later): a fully-custom Now-Playing CARD layout (our exact fonts/spacing +
+  "Chapter N of M" + a styled up-next list) rendered from the media status.
 
-  The sender uses a STANDARD QUEUE_LOAD (no proprietary customData) -- this receiver just
-  styles it, enables the rich commands, and handles resume itself. Eventually this can host
-  Plex casts too (one HB-branded receiver for everything).
+  DEPLOY: host receiver.html AND icon.svg (same folder) at a PUBLIC HTTPS URL, register
+  a Custom Receiver in the Cast console (points at receiver.html), register your home
+  devices, then set cast.receiver.appid in HydraBear config. Sender sends a standard
+  QUEUE_LOAD (no proprietary customData); media URLs carry their own token.
 ============================================================================= -->
 <title>HydraBear</title>
 <script src="https://www.gstatic.com/cast/sdk/libs/caf_receiver/v3/cast_receiver_framework.js"></script>
 <style>
-  html, body { margin: 0; height: 100%; background: #0f1115; color: #e6e6e6;
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  /* HB dark theme for the built-in player UI (cover + title + subtitle + progress + controls). */
+  /* HydraBear palette (from web/index.html): bg #0f1115, surfaces #171a21/#121620,
+     text #e6e6e6, GREEN accents #5a9 / #7fe08a, muted #9fb0c4. */
+  html, body {
+    margin: 0; height: 100%;
+    background: radial-gradient(circle at 50% 38%, #16202b 0%, #0f1115 70%);
+    color: #e6e6e6;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
   cast-media-player {
     --background-color: #0f1115;
-    --splash-image: none;
-    --theme-hue: 210;
-    --progress-color: #2b6cb0;
-    --logo-color: #8ab4d8;
+    --theme-hue: 150;                 /* green, matching HB's #5a9 accent */
+    --progress-color: #5aa987;        /* HB green progress fill (#5a9) */
     --title-color: #e6e6e6;
     --subtitle-color: #9fb0c4;
-    --buffering-color: #2b6cb0;
+    --logo-color: #7fe08a;            /* HB bright green */
+    --buffering-color: #7fe08a;
+    --splash-image: url("icon.svg");  /* HB hub mark on the idle/splash screen */
+    --logo-image: url("icon.svg");    /* small HB watermark during playback */
   }
 </style>
 </head>
@@ -58,8 +59,8 @@
       Cmd.ALL_BASIC_MEDIA | Cmd.QUEUE_NEXT | Cmd.QUEUE_PREV | Cmd.SEEK, true);
 
     // Reliable RESUME: the default receiver mishandles a currentTime in the LOAD (esp. chaptered m4b).
-    // Here we take the position (customData.startPosition, or the request's currentTime) and seek
-    // AFTER the media is ready -- no fragile sender-side post-load-seek.
+    // Take the position (customData.startPosition, else the request's currentTime) and seek AFTER the
+    // media is ready -- no fragile sender-side post-load-seek.
     let resumeTo = 0;
     pm.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, (req) => {
       const cd = (req.media && req.media.customData) || {};
@@ -71,9 +72,8 @@
       if (resumeTo > 1) { try { pm.seek(resumeTo); } catch (e) {} resumeTo = 0; }
     });
 
-    // FUTURE: render a fully custom Now-Playing card here from pm.getMediaInformation()
-    // (cover, book title, author, "Chapter N of M", progress) to match HB's UI exactly,
-    // and show the up-next queue. For now the styled built-in player + rich commands is the v1 receiver.
+    // PHASE 2 hook: render a fully-custom HB Now-Playing card here (cover, title, author,
+    // "Chapter N of M", styled up-next) from pm.getMediaInformation() + pm.getQueueManager().
 
     ctx.start(new cast.framework.CastReceiverOptions());
   </script>

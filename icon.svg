@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="app icon">
+  <!-- Name-agnostic mark: a central agent node coordinating orbiting devices.
+       Represents the function (a hub controlling many things), not the name,
+       so a rename never orphans the artwork. Content kept inside the maskable
+       safe zone (center ~80%). Palette = the site's green accent on a dark bg
+       (the old blue wasn't in the app's color scheme). -->
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0%" stop-color="#16202b"/>
+      <stop offset="100%" stop-color="#0b0d11"/>
+    </radialGradient>
+    <radialGradient id="core" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#bff3d1"/>
+      <stop offset="55%" stop-color="#74dd97"/>
+      <stop offset="100%" stop-color="#2fa363"/>
+    </radialGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- connecting spokes -->
+  <g stroke="#74dd97" stroke-width="7" stroke-linecap="round" opacity="0.55">
+    <line x1="256" y1="256" x2="256" y2="128"/>
+    <line x1="256" y1="256" x2="367" y2="192"/>
+    <line x1="256" y1="256" x2="367" y2="320"/>
+    <line x1="256" y1="256" x2="256" y2="384"/>
+    <line x1="256" y1="256" x2="145" y2="320"/>
+    <line x1="256" y1="256" x2="145" y2="192"/>
+  </g>
+
+  <!-- orbiting device nodes -->
+  <g fill="#d8f4e1">
+    <circle cx="256" cy="128" r="26"/>
+    <circle cx="367" cy="192" r="26"/>
+    <circle cx="367" cy="320" r="26"/>
+    <circle cx="256" cy="384" r="26"/>
+    <circle cx="145" cy="320" r="26"/>
+    <circle cx="145" cy="192" r="26"/>
+  </g>
+
+  <!-- central agent core -->
+  <circle cx="256" cy="256" r="58" fill="url(#core)" filter="url(#glow)"/>
+  <circle cx="256" cy="256" r="58" fill="none" stroke="#d0eeda" stroke-width="4" opacity="0.7"/>
+</svg>
