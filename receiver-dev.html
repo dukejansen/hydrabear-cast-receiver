@@ -50,7 +50,10 @@
     display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
   #author { font: 600 4.2vh system-ui; color: #cfe; margin-bottom: 2.4vh; min-height: 4.2vh; }
   #chapter { display: inline-block; font: 700 3vh system-ui; color: #0b120d; background: #7fe08a;
-    padding: .6vh 2vh; border-radius: 999px; letter-spacing: .04em; }
+    padding: .6vh 2vh; border-radius: 999px; letter-spacing: .04em; white-space: nowrap; flex: 0 0 auto; }
+  #chaptitle { font: 600 3.4vh system-ui; color: #cfe; overflow: hidden;
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  #upnext .unchap { color: #cfe; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
   #prog { height: 10px; background: #26332c; border-radius: 5px; overflow: hidden; margin: 1.8vh 0 .9vh; }
   #fill { height: 100%; width: 0; background: linear-gradient(90deg, #2c8f59, #5fe0a0); }
@@ -80,7 +83,7 @@
         <div id="eyebrow">Now Playing</div>
         <div id="title">Ready</div>
         <div id="author"></div>
-        <div id="chapter" style="display:none"></div>
+        <div id="chaprow" style="display:none;align-items:center;gap:1.6vh;"><span id="chapter"></span><span id="chaptitle"></span></div>
       </div>
     </div>
     <div id="prog"><div id="fill"></div></div>
@@ -93,7 +96,7 @@
       <button id="next" title="Next"><svg viewBox="0 0 24 24"><path d="M14.8 6H17v12h-2.2zM4 6l10.5 6L4 18z"/></svg></button>
     </div>
   </div>
-  <div id="ver">v9-dev</div>
+  <div id="ver">v10-dev</div>
   <script>
     const NAME = "HydraBear";
     const ctx = cast.framework.CastReceiverContext.getInstance();
@@ -101,6 +104,7 @@
     const Cmd = cast.framework.messages.Command;
     const $ = (id) => document.getElementById(id);
     const escHtml = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const chapLbl = (t) => { t = (t || "").trim(); return (!t || /^part\s*0*\d+$/i.test(t)) ? "" : t; }; // real chapter title, or '' for a generic "Part N"
     const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
     const ICON_PAUSE = '<svg viewBox="0 0 24 24"><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z"/></svg>';
 
@@ -137,12 +141,18 @@
         const au = cur.artist || cur.albumArtist || "";
         $("author").textContent = au;
         const cimg = imgOf(cur); if (cimg) $("cover").src = cimg;
-        if (idx >= 0 && items.length > 0) { $("chapter").style.display = "inline-block"; $("chapter").textContent = "Part " + (idx + 1) + " of " + items.length; }
+        if (idx >= 0 && items.length > 0) {
+          $("chaprow").style.display = "flex";
+          $("chapter").textContent = "Part " + (idx + 1) + " of " + items.length;
+          const _ct = chapLbl(cur.title);
+          $("chaptitle").textContent = _ct; $("chaptitle").style.display = _ct ? "" : "none";
+        } else { $("chaprow").style.display = "none"; }
         const nx = items[idx + 1];
         if (nx) { const nmd = mdOf(nx);
           $("ntitle").textContent = nmd.albumName || nmd.title || "Next part";     // BOOK title (albumName), like the web card
           const nau = nmd.artist || nmd.albumArtist || "";
-          $("nsub").innerHTML = (nau ? escHtml(nau) : "") + '<span class="unpill">Part ' + (idx + 2) + ' of ' + items.length + '</span>';
+          const _nct = chapLbl(nmd.title);
+          $("nsub").innerHTML = (nau ? escHtml(nau) : "") + '<span class="unpill">Part ' + (idx + 2) + ' of ' + items.length + '</span>' + (_nct ? ' <span class="unchap">' + escHtml(_nct) + '</span>' : '');
           $("nimg").src = imgOf(nmd) || "icon.svg"; $("upnext").style.display = "flex"; }
         else { $("upnext").style.display = "none"; }
       } catch (e) {}
