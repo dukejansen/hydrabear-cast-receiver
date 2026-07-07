@@ -35,6 +35,10 @@
   #upnext .un-txt { text-align: right; min-width: 0; }
   #upnext .un-lbl { color: #7fe08a; font: 800 2.1vh system-ui; letter-spacing: .16em; text-transform: uppercase; }
   #upnext #ntitle { font: 600 3vh system-ui; color: #cfe; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #upnext #nsub { display: flex; align-items: center; justify-content: flex-end; gap: 1vh; margin-top: .7vh;
+    font: 600 2.2vh system-ui; color: #9fb0c4; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+  #upnext .unpill { flex: 0 0 auto; font: 700 1.9vh system-ui; color: #0b120d; background: #7fe08a;
+    padding: .3vh 1.5vh; border-radius: 999px; letter-spacing: .03em; }
   #upnext img { width: 7.6vh; height: 7.6vh; border-radius: 8px; object-fit: cover; background: #0b0d11; flex: 0 0 auto; }
 
   #main { flex: 1 1 auto; display: flex; align-items: center; gap: 5vw; min-height: 0; }
@@ -68,7 +72,7 @@
   <div id="card">
     <div id="bar">
       <div id="brand"><img src="icon.svg" alt=""><span>HydraBear</span></div>
-      <div id="upnext"><div class="un-txt"><div class="un-lbl">Up Next</div><div id="ntitle"></div></div><img id="nimg" alt=""></div>
+      <div id="upnext"><div class="un-txt"><div class="un-lbl">Up Next</div><div id="ntitle"></div><div id="nsub"></div></div><img id="nimg" alt=""></div>
     </div>
     <div id="main">
       <img id="cover" alt="">
@@ -89,13 +93,14 @@
       <button id="next" title="Next"><svg viewBox="0 0 24 24"><path d="M14.8 6H17v12h-2.2zM4 6l10.5 6L4 18z"/></svg></button>
     </div>
   </div>
-  <div id="ver">v8-dev</div>
+  <div id="ver">v9-dev</div>
   <script>
     const NAME = "HydraBear";
     const ctx = cast.framework.CastReceiverContext.getInstance();
     const pm = ctx.getPlayerManager();
     const Cmd = cast.framework.messages.Command;
     const $ = (id) => document.getElementById(id);
+    const escHtml = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     const ICON_PLAY = '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>';
     const ICON_PAUSE = '<svg viewBox="0 0 24 24"><path d="M6.5 5h4v14h-4zM13.5 5h4v14h-4z"/></svg>';
 
@@ -134,7 +139,11 @@
         const cimg = imgOf(cur); if (cimg) $("cover").src = cimg;
         if (idx >= 0 && items.length > 0) { $("chapter").style.display = "inline-block"; $("chapter").textContent = "Part " + (idx + 1) + " of " + items.length; }
         const nx = items[idx + 1];
-        if (nx) { const nmd = mdOf(nx); $("ntitle").textContent = nmd.title || nmd.albumName || "Next part"; $("nimg").src = imgOf(nmd) || "icon.svg"; $("upnext").style.display = "flex"; }
+        if (nx) { const nmd = mdOf(nx);
+          $("ntitle").textContent = nmd.albumName || nmd.title || "Next part";     // BOOK title (albumName), like the web card
+          const nau = nmd.artist || nmd.albumArtist || "";
+          $("nsub").innerHTML = (nau ? escHtml(nau) : "") + '<span class="unpill">Part ' + (idx + 2) + ' of ' + items.length + '</span>';
+          $("nimg").src = imgOf(nmd) || "icon.svg"; $("upnext").style.display = "flex"; }
         else { $("upnext").style.display = "none"; }
       } catch (e) {}
     }
